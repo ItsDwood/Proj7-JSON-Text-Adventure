@@ -1,0 +1,422 @@
+import json, os, time, random
+
+def main():
+    # TODO: allow them to choose from multiple JSON files?
+    print("All files in the current directory:", os.listdir())
+    json_games = []
+    for i in os.listdir():
+        if i[-4:] == 'json':
+            json_games.append(i)
+    print("The JSON files in this directory are", json_games)
+    for i in range(len(json_games)):
+               print(i+1, json_games[i])
+    choice = int(input("What game would you like to play?"))
+    game_choice = (json_games[choice - 1])
+    game_thing = str(game_choice)
+    
+    
+    with open(game_thing) as fp:
+        game = json.load(fp)
+    print(check_bridges(game))
+    print_instructions()
+    print("You are about to play '{}'! Good luck!".format(game['__metadata__']['title']))
+    print("")
+    play(game)
+
+def find_non_win_rooms(game):
+    keep = []
+    for room_name in game.keys():
+        # skip if it is the "fake" metadata room that has title & start
+        if room_name == '__metadata__':
+            continue
+        # skip if it ends the game
+        if game[room_name].get('ends_game', False):
+            continue
+        # keep everything else:
+        keep.append(room_name)
+    return keep
+def check_bridges(game):
+    for room in game:
+        if room == '__metadata__':
+            continue
+        if room in game:
+            pass
+        if room not in game:
+            return False
+
+    return True
+def play(rooms):
+    # Where are we? Look in __metadata__ for the room we should start in first.
+    current_place = rooms['__metadata__']['start']
+    # The things the player has collected.
+    stuff = ['Cell Phone; no signal or battery...']
+    begin = time.perf_counter()
+    cat_place = random.choice(find_non_win_rooms(rooms))
+    
+    while True:
+        # Figure out what room we're in -- current_place is a name.
+        here = rooms[current_place]
+        # Print the description.
+        print(here["description"])
+        
+        if current_place == cat_place:
+            print("!!There's a cat in here!")
+        
+        if random.randint(0,2) == 1:
+            cat_room = rooms[cat_place]
+            cat_exit = random.choice(find_non_win_rooms(rooms))
+            cat_place = cat_exit
+        
+        if here.get("visited", False):
+            print("...You've been in this room before")
+        here['visited'] = True
+
+        # TODO: print any available items in the room...
+        if len(here['items']) == 0:
+            print("...There are no items in here")
+        if len(here['items']) >= 1:
+            print("Here are the items in the room:", here['items'])
+        # e.g., There is a Mansion Key.
+        if "Raw Fish" in stuff and current_place == cat_place:
+            print("...The cat purrs! Maybe you have something it wants?")
+        # Is this a game-over?
+        if here.get("ends_game", False):
+            break
+
+        # Allow the user to choose an exit:
+        usable_exits = find_usable_exits(here, stuff)
+        # Print out numbers for them to choose:
+        for i, exit in enumerate(usable_exits):
+            print("  {}. {}".format(i+1, exit['description']))
+
+        # See what they typed:
+        action = input("> ").lower().strip()
+
+        # If they type any variant of quit; exit the game.
+        if action in ["quit", "escape", "exit", "q"]:
+            print("You quit.")
+            break
+        if action == "help":
+            print_instructions()
+            continue
+
+        # TODO: if they type "stuff", print any items they have (check the stuff list!)
+        if action == "stuff":
+            if stuff == []:
+                print("You have nothing")
+                continue
+            else:
+                print(stuff)
+                continue
+        # TODO: if they type "take", grab any items in the room.
+        if action == "take":
+            for i in here['items']:
+                stuff.append(i)
+            here['items'].clear()
+            continue 
+        # TODO: if they type "search", or "find", look through any exits in the room that might be hidden, and make them not hidden anymore!
+        if action == "search":
+            for exit in here['exits']:
+                if exit.get("hidden", True):
+                    exit["hidden"] = False
+            continue
+        if action == "find":
+            for exit in here['exits']:
+                if exit.get("hidden", True):
+                    exit["hidden"] = False
+            continue
+        if action == "drop":
+            for i in range(len(stuff)):
+               print(i+1, stuff[i])
+            drop_item=int(input("Which item would you like to drop?"))
+            here['items'].append(stuff[drop_item-1])
+            stuff.pop(drop_item-1)
+            continue
+        if action == "time":
+            current = time.perf_counter()
+            print(f"You have spent {current - begin:0.2f} seconds in this game")
+            continue
+                    
+                
+                
+                
+        
+        
+            
+        # Try to turn their action into an exit, by number.
+        try:
+            num = int(action) - 1
+            selected = usable_exits[num]
+            if "Mansion Key" not in stuff:
+                if current_place == "crypt":
+                    break
+            if "Mansion Key" not in stuff:
+                if selected['destination'] == 'outside':
+                    print("You try to open the door, but it's locked!")
+                    continue
+                    
+                
+            current_place = selected['destination']
+            print("...")
+            
+        except:
+            print("I don't understand '{}'...".format(action))
+        
+    print("")
+    print("")
+    print("=== GAME OVER ===")
+
+def find_usable_exits(room, stuff):
+    """
+    Given a room, and the player's stuff, find a list of exits that they can use right now.
+    That means the exits must not be hidden, and if they require a key, the player has it.
+
+    RETURNS
+     - a list of exits that are visible (not hidden) and don't require a key!
+    """
+    usable = []
+    for exit in room['exits']:
+        if exit.get("hidden", False):
+            continue
+            usable.append(exit)
+            continue
+        usable.append(exit)
+    return usable
+    
+
+def print_instructions():
+    print("=== Instructions ===")
+    print(" - Type a number to select an exit.")
+    print(" - Type 'stuff' to see what you're carrying.")
+    print(" - Type 'take' to pick up an item.")
+    print(" - Type 'quit' to exit the game.")
+    print(" - Type 'search' to take a deeper look at a room.")
+    print(" - Type 'time' to see how many seconds you have spent in the game.")
+    print("=== Instructions ===")
+    print("")
+
+if __name__ == '__main__':
+    main()
+
+import json
+
+# This global dictionary stores the name of the room as the key and the dictionary describing the room as the value.
+GAME = {
+    '__metadata__': {
+        'title': 'Adventure',
+        'start': 'classroom'
+    }
+}
+
+def create_room(name, description, ends_game=False):
+    """
+    Create a dictionary that represents a room in our game.
+
+    INPUTS:
+     name: string used to identify the room; think of this as a variable name.
+     description: string used to describe the room to the user.
+     ends_game: boolean, True if arriving in this room ends the game.
+    
+    RETURNS:
+     the dictionary describing the room; also adds it to GAME!
+    """
+    assert (name not in GAME)
+    room = {
+        'name': name,
+        'description': description,
+        'exits': [],
+        'items': [],
+        'cat': False
+    }
+    # Does this end the game?
+    if ends_game:
+        room['ends_game'] = ends_game
+
+    # Stick it into our big dictionary of all the rooms.
+    GAME[name] = room
+    return room
+
+def create_exit(source, destination, description):
+    """
+    Rooms are useless if you can't get to them! This function connects source to destination (in one direction only.)
+
+    INPUTS:
+     source: which room to put this exit into (or its name)
+     destination: where this exit goes (or its name)
+     description: how to show this exit to the user (ex: "There is a red door.")
+     required_key (optional): string of an item that is needed to open/reveal this door.
+     hidden (optional): set this to True if you want this exit to be hidden initially; until the user types 'search' in the source room.
+    """
+    # Make sure source is our room!
+    if isinstance(source, str):
+        source = GAME[source]
+    # Make sure destination is a room-name!
+    if isinstance(destination, dict):
+        destination = destination['name']
+    # Create the "exit":
+    exit = {
+        'destination': destination,
+        'description': description
+    }
+    source['exits'].append(exit)
+    return exit
+
+##
+# Let's imagine 4 places:
+# Note that earlier, in __metadata__ we said that we should start in classroom.
+##
+classroom = create_room("classroom", "You're in a lecture hall, for some reason.")
+hallway = create_room("hallway", "This is a hallway with many locked doors.")
+staircase = create_room("staircase", "The staircase leads downward.")
+outside = create_room("outside", "You've escaped! It's cold out.", ends_game=True)
+
+##
+# Let's connect them together.
+# It's not a very fun adventure, but it's simple.
+##
+create_exit(classroom, hallway, "A door leads into the hall.")
+# If you want doors to work in both directions; you have to do that yourself.
+create_exit(hallway, classroom, "Go back into the classroom.")
+# Note we can also refer to places by their names (same as their variables for my sanity!)
+create_exit('hallway', 'staircase', "A door with the words STAIRS is stuck open.")
+create_exit(staircase, hallway, "Nevermind; go back to the hallway.")
+
+create_exit(staircase, outside, "A door at the bottom of the stairs has a red, glowing, EXIT sign.")
+# we don't go back from outside, because the game ends as soon as we get there.
+
+##
+# Save our text-adventure to a file:
+##
+with open('adventure.json', 'w') as out:
+    json.dump(GAME, out, indent=2)
+    
+    
+import json
+
+# This global dictionary stores the name of the room as the key and the dictionary describing the room as the value.
+GAME = {
+    '__metadata__': {
+        'title': 'Spooky Mansion',
+        'start': 'entranceHall'
+    }
+}
+
+def create_room(name, description, ends_game=False, first_time=None):
+    assert (name not in GAME)
+    room = {
+        'name': name,
+        'description': description,
+        'exits': [],
+        'items': [],
+        'cat': False
+    }
+    # Is there a special message for the first visit?
+    if first_time:
+        exit['first_time'] = first_time
+    # Does this end the game?
+    if ends_game:
+        room['ends_game'] = ends_game
+
+    # Stick it into our big dictionary of all the rooms.
+    GAME[name] = room
+    return room
+
+def create_exit(source, destination, description, required_key=None, hidden=False):
+    # Make sure source is our room!
+    if isinstance(source, str):
+        source = GAME[source]
+    # Make sure destination is a room-name!
+    if isinstance(destination, dict):
+        destination = destination['name']
+    # Create the "exit":
+    exit = {
+        'destination': destination,
+        'description': description
+    }
+    # Is it locked?
+    if required_key:
+        exit['required_key'] = required_key
+    # Do we need to search for this?
+    if hidden:
+        exit['hidden'] = hidden
+    source['exits'].append(exit)
+    return exit
+
+front_door_key = "Mansion Key"
+raw_fish = "Raw Fish"
+    
+entranceHall = create_room("entranceHall", """You are in the grand entrance hall of a large building.
+How did you get here?""")
+create_exit(entranceHall, "basement", "There are stairs leading down.")
+create_exit(entranceHall, "attic", "There are stairs leading up.")
+create_exit(entranceHall, "kitchen", "There is a red door.")
+create_exit(entranceHall, "outside", "The front door.", required_key=front_door_key)
+
+basement = create_room("basement", """You have found the basement of the mansion.
+It is darker down here.
+You get the sense a secret is nearby, but you only see the stairs you came from.""")
+create_exit(basement, entranceHall, "There are stairs leading up.")
+create_exit(basement, "secretRoom", "A trapdoor was hidden amongst the dust.", hidden=True)
+
+attic = create_room("attic", """Something rustles in the rafters as you enter the attic. Creepy.
+It's big and dark up here.""")
+create_exit(attic, entranceHall, "There are stairs leading down.")
+create_exit(attic, "attic2", "There is an archway.")
+
+attic2 = create_room("attic2", """There's definitely a bat in here somewhere.
+This part of the attic is brighter, so maybe you're safe here.""")
+create_exit(attic2, attic, "There is an archway.")
+create_exit(attic2, "balcony", "A small door rattles in the wind.")
+create_exit(attic2, "dumbwaiter", "There is a dumbwaiter near the chimney.")
+
+balcony = create_room("balcony", """There's a strange light here on the balcony.""")
+balcony["items"].append(front_door_key)
+create_exit(balcony, "aliens", "Step into the light.")
+create_exit(balcony, "attic2", "Go back inside.")
+
+create_room("aliens", """The aliens take you aboard their spaceship.
+...
+I guess you escaped.""", ends_game=True)
+
+kitchen = create_room("kitchen", """You've found the kitchen. You smell moldy food and some kind of animal.""")
+kitchen["items"].append(raw_fish)
+create_exit(kitchen, entranceHall, "There is a red door.")
+create_exit(kitchen, "dumbwaiter", "There is a dumbwaiter.")
+
+dumbwaiter = create_room("dumbwaiter", """You crawl into the dumbwaiter. What are you doing?""")
+create_exit(dumbwaiter, attic2, "Exit at the top.")
+create_exit(dumbwaiter, kitchen, "Exit on the first-floor.")
+create_exit(dumbwaiter, "secretRoom", "Exit at the bottom.")
+
+secretRoom = create_room("secretRoom", """You have found the secret room.
+Who thought a green rug was a good idea?""")
+create_exit(secretRoom, "hallway0", "A long hallway leads away.")
+create_exit(secretRoom, basement, "You see a trapdoor with a spider crawling on it.")
+create_exit(secretRoom, dumbwaiter, "Get back in the dumbwaiter.")
+
+crypt = create_room("crypt", """You've found your way into a crypt. You smell dirt.""")
+create_exit(crypt, "outside", "There are stairs leading up.")
+outside = create_room("outside", """You step out into the night.
+
+It smells like freedom.
+""", ends_game=True)
+
+hallway_length = 3
+for i in range(hallway_length):
+    here = "hallway{}".format(i)
+    forward = "hallway{}".format(i+1)
+    backward = "hallway{}".format(i-1)
+    if i == 0:
+        backward = "secretRoom"
+    elif i == hallway_length - 1:
+        forward = "crypt"
+    create_room(here, """This is a very long hallway.""")
+    create_exit(here, backward, """Go back.""")
+    create_exit(here, forward, """Go forward.""")
+
+##
+# Save our text-adventure to a file:
+##
+with open('spooky_mansion.json', 'w') as out:
+    json.dump(GAME, out, indent=2)
+
